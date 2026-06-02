@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Дашборд ОРМ — Live</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#ECF0F1;color:#2C3E50;font-size:14px}
+header{background:#2C3E50;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+header h1{font-size:17px;font-weight:600}
+.hright{display:flex;align-items:center;gap:14px;font-size:12px}
+#sdot{width:8px;height:8px;border-radius:50%;background:#F39C12;display:inline-block}
+#sdot.ok{background:#2ECC71}#sdot.err{background:#E74C3C}
+#sdot.spin{background:#F39C12;animation:p 1s infinite}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+nav{background:#34495E;display:flex;border-bottom:2px solid #2C3E50}
+.nb{background:none;border:none;color:#BDC3C7;padding:12px 20px;cursor:pointer;font-size:13px;font-weight:500;border-bottom:3px solid transparent;transition:all .2s}
+.nb.active{color:#fff;border-bottom-color:#3498DB;background:rgba(52,152,219,.15)}
+.nb:hover:not(.active){color:#fff;background:rgba(255,255,255,.08)}
+.filters{background:#fff;padding:10px 24px;display:flex;gap:16px;align-items:center;border-bottom:1px solid #ddd;flex-wrap:wrap}
+.filters label{font-size:11px;color:#7F8C8D;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+select{border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:13px;color:#2C3E50;background:#fff;cursor:pointer}
+select:focus{outline:2px solid #3498DB}
+.page{display:none;padding:20px 24px}.page.active{display:block}
+.st{font-size:15px;font-weight:600;color:#2C3E50;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #3498DB;display:inline-block}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:20px}
+.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px}
+.g4{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);border:1px solid #E8E8E8}
+.mc{background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.08);border:1px solid #E8E8E8;text-align:center}
+.ml{font-size:11px;color:#7F8C8D;text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:6px}
+.mv{font-size:26px;font-weight:700;line-height:1}
+.ms{font-size:11px;color:#95A5A6;margin-top:4px}
+.mb{color:#3498DB}.mr{color:#E74C3C}.mg{color:#27AE60}.mo{color:#E67E22}.mp{color:#8E44AD}
+.badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.bok{background:#D5F5E3;color:#1E8449}.bwn{background:#FDEBD0;color:#A04000}.bdn{background:#FADBD8;color:#922B21}.bin{background:#D6EAF8;color:#1A5276}
+.cw{position:relative;width:100%;height:250px}
+.cwl{position:relative;width:100%;height:310px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#F8F9FA;color:#5D6D7E;font-weight:600;text-align:left;padding:8px 10px;border-bottom:2px solid #ECF0F1;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+td{padding:8px 10px;border-bottom:1px solid #F2F3F4}
+tr:last-child td{border-bottom:none}tr:hover td{background:#FAFBFC}
+.lr{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:#5D6D7E}
+.li{display:flex;align-items:center;gap:5px}
+.ld{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.pb{background:#ECF0F1;border-radius:4px;height:8px;overflow:hidden;margin-top:4px}
+.pf{height:100%;border-radius:4px}
+.tag{display:inline-block;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500;margin:1px}
+.ib{background:#EBF5FB;border-left:4px solid #3498DB;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#1A5276;margin-bottom:14px}
+.wb{background:#FDEBD0;border-left:4px solid #E67E22;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#A04000;margin-bottom:14px}
+.eb{background:#FADBD8;border-left:4px solid #E74C3C;padding:12px 16px;border-radius:0 6px 6px 0;font-size:13px;color:#922B21;margin:0 24px 14px;display:none}
+.ov{position:fixed;inset:0;background:rgba(44,62,80,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;color:#fff;gap:16px}
+.sp{width:44px;height:44px;border:4px solid rgba(255,255,255,.3);border-top-color:#3498DB;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sep{height:20px}
+</style>
+</head>
+<body>
+
+<div class="ov" id="ov">
+  <div class="sp"></div>
+  <div style="font-size:15px;font-weight:500">Загружаю данные из Google Sheets…</div>
+  <div style="font-size:12px;opacity:.7" id="ovd">Подключение…</div>
+</div>
+
+<header>
+  <h1>📊 Дашборд ОРМ — Отдел продаж</h1>
+  <div class="hright">
+    <span id="sdot" class="spin"></span>
+    <span id="stxt">Загрузка…</span>
+    <button onclick="reload()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px">🔄 Обновить</button>
+    <span id="lupd" style="opacity:.6;font-size:11px"></span>
+  </div>
+</header>
+
+<nav>
+  <button class="nb active" onclick="showPage('history',this)">📈 Исторические данные</button>
+  <button class="nb" onclick="showPage('current',this)">🏢 Текущая ситуация</button>
+  <button class="nb" onclick="showPage('forecast',this)">🔮 Прогноз 2026</button>
+</nav>
+
+<div class="filters">
+  <div style="display:flex;align-items:center;gap:8px"><label>РОП:</label><select id="frop" onchange="applyF()"><option value="all">Все РОПы</option></select></div>
+  <div style="display:flex;align-items:center;gap:8px"><label>Тимлид:</label><select id="ftl" onchange="applyF()"><option value="all">Все тимлиды</option></select></div>
+  <div style="display:flex;align-items:center;gap:8px"><label>Год:</label>
+    <select id="fyr" onchange="applyF()"><option value="all">Все</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select>
+  </div>
+</div>
+
+<div class="eb" id="eb"></div>
+
+<!-- HISTORY -->
+<div id="page-history" class="page active">
+  <div class="g4" id="hkpi"></div>
+  <div class="g2">
+    <div class="card"><div class="st">Динамика найма и увольнений</div>
+      <div class="lr"><div class="li"><div class="ld" style="background:#3498DB"></div>Принято</div><div class="li"><div class="ld" style="background:#E74C3C"></div>Уволено</div><div class="li"><div class="ld" style="background:#2ECC71"></div>Численность</div></div>
+      <div class="cwl"><canvas id="cDyn"></canvas></div></div>
+    <div class="card"><div class="st">Текучесть по месяцам (%)</div>
+      <div class="lr"><div class="li"><div class="ld" style="background:#E74C3C"></div>2024</div><div class="li"><div class="ld" style="background:#3498DB"></div>2025</div><div class="li"><div class="ld" style="background:#F39C12"></div>2026</div></div>
+      <div class="cwl"><canvas id="cTurn"></canvas></div></div>
+  </div>
+  <div class="g2">
+    <div class="card"><div class="st">Отток по когортам</div>
+      <table><thead><tr><th>Когорта</th><th>Принято</th><th>Уволено</th><th>Отток</th><th>Статус</th></tr></thead><tbody id="ctb"></tbody></table></div>
+    <div class="card"><div class="st">Уволенных по годам</div><div class="cw"><canvas id="cYear"></canvas></div></div>
+  </div>
+  <div class="sep"></div>
+  <div class="st">Сводная таблица по годам</div>
+  <div class="card" style="margin-top:12px"><table><thead><tr><th>Год</th><th>Нач.</th><th>Принято</th><th>Уволено</th><th>Кон.</th><th>ССЧ</th><th>Текучесть</th></tr></thead><tbody id="ytb"></tbody></table></div>
+  <div class="sep"></div>
+  <div class="st">Динамика по РОПам (2025)</div>
+  <div class="card" style="margin-top:12px"><div class="lr" id="rhl"></div><div class="cwl"><canvas id="cRopH"></canvas></div></div>
+</div>
+
+<!-- CURRENT -->
+<div id="page-current" class="page">
+  <div class="g4" id="ckpi"></div>
+  <div class="g2">
+    <div class="card"><div class="st">Распределение по когортам</div><div class="cw"><canvas id="cCoh"></canvas></div></div>
+    <div class="card"><div class="st">Нагрузка тимлидов</div>
+      <div class="ib">Лимит: 10 сотрудников / 3 новичка на тимлида</div>
+      <div style="max-height:260px;overflow-y:auto">
+        <table><thead><tr><th>Тимлид</th><th>РОП</th><th>0-3</th><th>3-6</th><th>6-12</th><th>12+</th><th>Итого</th><th>Статус</th></tr></thead><tbody id="tltb"></tbody></table>
+      </div>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="st">Состав по РОПам</div>
+  <div class="card" style="margin-top:12px">
+    <div class="lr"><div class="li"><div class="ld" style="background:#E74C3C"></div>0–3 мес</div><div class="li"><div class="ld" style="background:#E67E22"></div>3–6 мес</div><div class="li"><div class="ld" style="background:#3498DB"></div>6–12 мес</div><div class="li"><div class="ld" style="background:#27AE60"></div>12+ мес</div></div>
+    <div class="cwl"><canvas id="cRopC"></canvas></div>
+  </div>
+  <div class="sep"></div>
+  <div class="st">Детализация по РОПам</div>
+  <div class="card" style="margin-top:12px"><table><thead><tr><th>РОП</th><th>ТЛ</th><th>Штат</th><th>Лимит</th><th>Резерв</th><th>Новичков</th><th>Лим.нов.</th><th>Статус</th></tr></thead><tbody id="roptb"></tbody></table></div>
+  <div class="sep"></div>
+  <div class="st">Карточки тимлидов</div>
+  <div class="g3" id="tlcards" style="margin-top:12px"></div>
+</div>
+
+<!-- FORECAST -->
+<div id="page-forecast" class="page">
+  <div class="ib">Сценарий: максимальный допустимый найм. Лимит: 370 чел. ТЛ: 37. Новичков на ТЛ: 3. Сотр. на ТЛ: 10.</div>
+  <div class="g4" id="fckpi"></div>
+  <div class="g2">
+    <div class="card"><div class="st">Прогноз численности май–декабрь 2026</div>
+      <div class="lr"><div class="li"><div class="ld" style="background:#3498DB"></div>Штат</div><div class="li"><div class="ld" style="background:#E74C3C"></div>Выбытие</div><div class="li"><div class="ld" style="background:#2ECC71"></div>Найм</div><div class="li"><div class="ld" style="background:#F39C12;opacity:.5"></div>Лимит 370</div></div>
+      <div class="cwl"><canvas id="cFcM"></canvas></div></div>
+    <div class="card"><div class="st">Новички (0–3 мес) в прогнозе</div>
+      <div class="lr"><div class="li"><div class="ld" style="background:#9B59B6"></div>Новички</div><div class="li"><div class="ld" style="background:#E74C3C;opacity:.5"></div>Лимит 111</div></div>
+      <div class="cwl"><canvas id="cFcN"></canvas></div></div>
+  </div>
+  <div class="sep"></div>
+  <div class="st">Детализация по месяцам</div>
+  <div class="card" style="margin-top:12px"><table><thead><tr><th>Месяц</th><th>Штат нач.</th><th>Выбытие</th><th>Найм</th><th>Штат кон.</th><th>Новички</th><th>Резерв ТЛ</th><th>Ограничение</th></tr></thead><tbody id="fctb"></tbody></table></div>
+  <div class="sep"></div>
+  <div class="st">Лимиты по РОПам</div>
+  <div class="card" style="margin-top:12px">
+    <div class="wb" id="ropwb"></div>
+    <table><thead><tr><th>РОП</th><th>Штат</th><th>ТЛ</th><th>Лимит</th><th>Новичков</th><th>Лим.нов.</th><th>Статус</th></tr></thead><tbody id="roplim"></tbody></table>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ────────────────────────────────────────────────────────────────
+const SID = '1Xbz_P7gM5PtfQscxkHBFKFqwnitXZWE4_-vbIx8-dCM';
+const KEY  = 'AIzaSyBcvQza6D8-T_vWX8cfCoJpAhO0bzQlGrM';
+
+// Ключевое исправление: используем gviz/tq endpoint — он работает без проблем с кириллицей
+// и не требует кодирования имён листов
+async function fetchSheet(sheetName, cols) {
+  // gviz endpoint принимает имя листа как есть, без кодирования
+  const url = 'https://docs.google.com/spreadsheets/d/' + SID
+    + '/gviz/tq?tqx=out:json&sheet=' + encodeURIComponent(sheetName)
+    + '&key=' + KEY;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const txt = await r.text();
+  // gviz возвращает JSONP-обёртку: google.visualization.Query.setResponse({...})
+  const json = JSON.parse(txt.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
+  if (!json.table || !json.table.rows) return [];
+  // Преобразуем в массив массивов строк (как Sheets API v4)
+  return json.table.rows.map(row =>
+    (row.c || []).map(cell => {
+      if (!cell) return '';
+      if (cell.v === null || cell.v === undefined) return '';
+      // Даты gviz возвращает как Date(year,month,day) — конвертируем
+      if (typeof cell.v === 'string' && cell.v.startsWith('Date(')) {
+        const parts = cell.v.replace('Date(','').replace(')','').split(',').map(Number);
+        const d = new Date(parts[0], parts[1], parts[2]);
+        return d.getDate().toString().padStart(2,'0') + '.'
+             + (d.getMonth()+1).toString().padStart(2,'0') + '.'
+             + d.getFullYear();
+      }
+      // Форматированное значение предпочтительнее
+      return cell.f !== undefined && cell.f !== null ? String(cell.f) : String(cell.v);
+    })
+  );
+}
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+const S = { emp:[], fakt:[], tl:[] };
+const CH = {};
+
+// ─── HELPERS ───────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+function num(v){ return parseFloat(String(v||0).replace(',','.').replace('%','').trim())||0; }
+function yr(s){ const p=(s||'').split('.'); return p.length===3?parseInt(p[2]):0; }
+function mo(s){ const p=(s||'').split('.'); return p.length===3?parseInt(p[1]):0; }
+function kill(id){ if(CH[id]){CH[id].destroy();delete CH[id];} }
+function setSt(cls,txt){ $('sdot').className=cls; $('stxt').textContent=txt; }
+
+// ─── NAV ───────────────────────────────────────────────────────────────────
+function showPage(p,btn){
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(e=>e.classList.remove('active'));
+  $('page-'+p).classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+
+// ─── LOAD ──────────────────────────────────────────────────────────────────
+async function reload(){
+  setSt('spin','Загрузка…');
+  $('ov').style.display='flex';
+  $('eb').style.display='none';
+  try {
+    $('ovd').textContent='Лист «Данные»…';
+    const re = await fetchSheet('Данные');
+    // Первая строка — заголовки, пропускаем
+    S.emp = re.slice(1).filter(r=>r[0]&&r[0].trim()&&r[0].trim()!=='ФИО').map(r=>({
+      name:  (r[0]||'').trim(),
+      hired: (r[1]||'').trim(),
+      fired: (r[2]||'').trim(),
+      grade: (r[3]||'').trim(),
+      rop:   (r[4]||'').trim(),
+      tl:    (r[5]||'').trim(),
+      days:  num(r[6]),
+      cohort:(r[7]||'').trim(),
+      status:(r[8]||'').trim(),
+    }));
+
+    $('ovd').textContent='Лист «Факт»…';
+    const rf = await fetchSheet('Факт');
+    S.fakt = rf.slice(1).filter(r=>r[0]&&r[0].includes('.')).map(r=>({
+      month:r[0], staff:num(r[1]), hired:num(r[2]), fired:num(r[3]), avg:num(r[4]), turn:num(r[5])
+    }));
+
+    $('ovd').textContent='Лист «Тимлиды нагрузка»…';
+    const rt = await fetchSheet('Тимлиды нагрузка');
+    S.tl=[];
+    let curRop='';
+    rt.slice(1).forEach(r=>{
+      const v0=(r[0]||'').trim(), v1=(r[1]||'').trim();
+      if(!v0) return;
+      if(v0.startsWith('Всего')||v0.startsWith('COUNTA')||v0.startsWith('Итого')) return;
+      if(!v1){ curRop=v0; return; }
+      S.tl.push({ rop:curRop, tl:v1, c1:num(r[2]), c2:num(r[3]), c3:num(r[4]), c4:num(r[5]), total:num(r[6]) });
+    });
+
+    renderAll();
+    setSt('ok','Данные актуальны');
+    $('lupd').textContent='Обновлено: '+new Date().toLocaleTimeString('ru-RU');
+  } catch(e){
+    console.error(e);
+    setSt('err','Ошибка');
+    $('eb').style.display='block';
+    $('eb').innerHTML='⚠ Ошибка загрузки: <code>'+e.message+'</code><br><small>Убедитесь что таблица открыта по ссылке (Файл → Настройки доступа → Все по ссылке → Читатель)</small>';
+    renderFallback();
+  } finally {
+    $('ov').style.display='none';
+  }
+}
+
+// ─── RENDER ALL ────────────────────────────────────────────────────────────
+function renderAll(){
+  histKPI(); dynChart(); turnChart(); cohortTbl(); yearChart(); yearSummary(); ropHistChart();
+  fillFilters(); applyF(); fcRender();
+}
+function renderFallback(){ histKPI(); yearSummary(); fcRender(); }
+
+// ─── HISTORY ───────────────────────────────────────────────────────────────
+function tot(yr_){ return S.fakt.filter(m=>yr(m.month)===yr_).reduce((a,m)=>({h:a.h+m.hired,f:a.f+m.fired}),{h:0,f:0}); }
+
+function histKPI(){
+  const t24=tot(2024),t25=tot(2025);
+  $('hkpi').innerHTML=`
+    <div class="mc"><div class="ml">Принято 2024</div><div class="mv mb">${t24.h||476}</div><div class="ms">сотрудников</div></div>
+    <div class="mc"><div class="ml">Уволено 2024</div><div class="mv mr">${t24.f||409}</div><div class="ms">текучесть ~391%</div></div>
+    <div class="mc"><div class="ml">Принято 2025</div><div class="mv mb">${t25.h||450}</div><div class="ms">сотрудников</div></div>
+    <div class="mc"><div class="ml">Уволено 2025</div><div class="mv mo">${t25.f||322}</div><div class="ms">текучесть ~159%</div></div>`;
+}
+
+function dynChart(){
+  const MN=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  const s=[...S.fakt].sort((a,b)=>a.month.localeCompare(b.month));
+  const lb=s.map(m=>{ const p=m.month.split('.'); return (MN[parseInt(p[1])]||p[1])+' '+p[2]; });
+  kill('cDyn');
+  CH.cDyn=new Chart($('cDyn'),{type:'bar',data:{labels:lb,datasets:[
+    {label:'Принято',data:s.map(m=>m.hired),backgroundColor:'rgba(52,152,219,.7)',borderColor:'#3498DB',borderWidth:1},
+    {label:'Уволено',data:s.map(m=>m.fired),backgroundColor:'rgba(231,76,60,.7)',borderColor:'#E74C3C',borderWidth:1},
+    {label:'Числ.',data:s.map(m=>m.staff),type:'line',borderColor:'#2ECC71',backgroundColor:'transparent',tension:.3,pointRadius:2,borderWidth:2,yAxisID:'y1'}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{y:{beginAtZero:true,title:{display:true,text:'Чел.'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'Штат'}}}}});
+}
+
+function turnChart(){
+  const MN=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  function ya(y_){ const a=Array(12).fill(null); S.fakt.filter(m=>yr(m.month)===y_).forEach(m=>{const i=mo(m.month)-1;if(i>=0)a[i]=m.turn;}); return a; }
+  kill('cTurn');
+  CH.cTurn=new Chart($('cTurn'),{type:'line',data:{labels:MN,datasets:[
+    {label:'2024',data:ya(2024),borderColor:'#E74C3C',tension:.3,pointRadius:3,borderWidth:2,borderDash:[5,4],backgroundColor:'transparent'},
+    {label:'2025',data:ya(2025),borderColor:'#3498DB',tension:.3,pointRadius:3,borderWidth:2,backgroundColor:'transparent'},
+    {label:'2026',data:ya(2026),borderColor:'#F39C12',tension:.3,pointRadius:4,borderWidth:2,backgroundColor:'transparent'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'%'},beginAtZero:true}}}});
+}
+
+function cohortTbl(){
+  const all=S.emp, fired=all.filter(e=>e.fired&&e.fired!=='');
+  const rows=[{n:'0–3 мес',k:'0-3'},{n:'3–6 мес',k:'3-6'},{n:'6–12 мес',k:'6-12'},{n:'12+ мес',k:'12+'}];
+  $('ctb').innerHTML=rows.map(r=>{
+    const h=all.filter(e=>e.cohort.includes(r.k)).length;
+    const f=fired.filter(e=>e.cohort.includes(r.k)).length;
+    const p=h?Math.round(f/h*100):0;
+    const b=p>85?'bdn':p>55?'bwn':'bok';
+    const l=p>85?'Критично':p>55?'Высокий':'Приемлемо';
+    return `<tr><td>${r.n}</td><td>${h}</td><td>${f}</td><td>${p}%</td><td><span class="badge ${b}">${l}</span></td></tr>`;
+  }).join('');
+}
+
+function yearChart(){
+  const fired=S.emp.filter(e=>e.fired&&e.fired!=='');
+  function c(y_,k){ return fired.filter(e=>yr(e.fired)===y_&&e.cohort.includes(k)).length; }
+  kill('cYear');
+  CH.cYear=new Chart($('cYear'),{type:'bar',data:{labels:['2024','2025','2026'],datasets:[
+    {label:'0–3',data:[c(2024,'0-3'),c(2025,'0-3'),c(2026,'0-3')],backgroundColor:'rgba(231,76,60,.8)'},
+    {label:'3–6',data:[c(2024,'3-6'),c(2025,'3-6'),c(2026,'3-6')],backgroundColor:'rgba(230,126,34,.8)'},
+    {label:'6–12',data:[c(2024,'6-12'),c(2025,'6-12'),c(2026,'6-12')],backgroundColor:'rgba(52,152,219,.8)'},
+    {label:'12+',data:[c(2024,'12+'),c(2025,'12+'),c(2026,'12+')],backgroundColor:'rgba(39,174,96,.8)'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:'Чел.'}}}}});
+}
+
+function yearSummary(){
+  function ys(y_){
+    const rows=S.fakt.filter(m=>yr(m.month)===y_).sort((a,b)=>mo(a.month)-mo(b.month));
+    if(!rows.length) return null;
+    return {h:rows.reduce((s,m)=>s+m.hired,0),f:rows.reduce((s,m)=>s+m.fired,0),
+      start:rows[0].staff,end:rows[rows.length-1].staff,
+      avg:Math.round(rows.reduce((s,m)=>s+(m.avg||m.staff),0)/rows.length)};
+  }
+  const y24=ys(2024)||{h:476,f:409,start:71,end:138,avg:104};
+  const y25=ys(2025)||{h:450,f:322,start:138,end:266,avg:202};
+  const y26=ys(2026)||{h:192,f:203,start:266,end:255,avg:261};
+  $('ytb').innerHTML=`
+    <tr><td><b>2024</b></td><td>${y24.start}</td><td>${y24.h}</td><td>${y24.f}</td><td>${y24.end}</td><td>${y24.avg}</td><td><span class="badge bdn">~391%</span></td></tr>
+    <tr><td><b>2025</b></td><td>${y25.start}</td><td>${y25.h}</td><td>${y25.f}</td><td>${y25.end}</td><td>${y25.avg}</td><td><span class="badge bdn">~159%</span></td></tr>
+    <tr><td><b>2026 (янв–апр)</b></td><td>${y26.start}</td><td>${y26.h}</td><td>${y26.f}</td><td>${y26.end}</td><td>${y26.avg}</td><td><span class="badge bwn">~78%</span></td></tr>`;
+}
+
+const RC=['#3498DB','#E74C3C','#2ECC71','#F39C12','#9B59B6','#1ABC9C','#E67E22','#34495E'];
+function ropHistChart(){
+  const rs={
+    'Андриянов Иван': [18,19,17,19,25,30,33,29,29,34,39,38],
+    'Байер Даниил':   [25,28,33,31,36,38,37,39,44,43,47,55],
+    'Хвалько Никита': [39,40,38,33,37,40,40,40,43,53,59,66],
+    'Тимиряев Даниил':[23,23,28,29,32,27,29,29,33,34,37,46],
+    'Меладинов Вадим':[21,22,17,23,31,29,27,28,28,24,38,45],
+  };
+  const MN=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'].map(m=>m+' 25');
+  const ent=Object.entries(rs);
+  $('rhl').innerHTML=ent.map(([n],i)=>`<div class="li"><div class="ld" style="background:${RC[i]}"></div>${n.split(' ')[0]}</div>`).join('');
+  kill('cRopH');
+  CH.cRopH=new Chart($('cRopH'),{type:'line',data:{labels:MN,datasets:ent.map(([name,data],i)=>({
+    label:name,data,borderColor:RC[i],backgroundColor:'transparent',tension:.3,pointRadius:2,borderWidth:2,
+    borderDash:i===0?undefined:[4+i*2,2]
+  }))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'Чел.'},beginAtZero:true}}}});
+}
+
+// ─── FILTERS ───────────────────────────────────────────────────────────────
+function fillFilters(){
+  const rops=[...new Set(S.emp.map(e=>e.rop).filter(r=>r&&r!=='-'))].sort();
+  const tls=[...new Set(S.emp.map(e=>e.tl).filter(t=>t&&t!=='-'))].sort();
+  $('frop').innerHTML='<option value="all">Все РОПы</option>'+rops.map(r=>`<option value="${r}">${r}</option>`).join('');
+  $('ftl').innerHTML='<option value="all">Все тимлиды</option>'+tls.map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+
+function applyF(){
+  const rop=$('frop').value, tl=$('ftl').value;
+  curKPI(rop,tl); cohChart(rop,tl); tlTable(rop,tl);
+  ropCompChart(rop); ropDetail(rop); tlCards(rop,tl);
+}
+
+// ─── CURRENT ───────────────────────────────────────────────────────────────
+function actEmp(rop,tl){
+  return S.emp.filter(e=>{
+    const live=!e.fired||e.fired==='';
+    return live&&(rop==='all'||e.rop===rop)&&(tl==='all'||e.tl===tl);
+  });
+}
+function isROP(e){ return e.grade==='РОП'; }
+function isTL(e){ return /тимлид/i.test(e.grade); }
+
+function curKPI(rop,tl){
+  const emp=actEmp(rop,tl);
+  const line=emp.filter(e=>!isROP(e)&&!isTL(e)).length;
+  const c1=emp.filter(e=>e.cohort.includes('0-3')).length;
+  const c4=emp.filter(e=>e.cohort.includes('12+')).length;
+  $('ckpi').innerHTML=`
+    <div class="mc"><div class="ml">Всего активных</div><div class="mv mb">${emp.length}</div><div class="ms">сотрудников</div></div>
+    <div class="mc"><div class="ml">Линейный персонал</div><div class="mv mp">${line}</div><div class="ms">без РОП и ТЛ</div></div>
+    <div class="mc"><div class="ml">Новички 0–3 мес</div><div class="mv mr">${c1}</div><div class="ms"></div></div>
+    <div class="mc"><div class="ml">Ветераны 12+ мес</div><div class="mv mg">${c4}</div><div class="ms"></div></div>`;
+}
+
+function cohChart(rop,tl){
+  const emp=actEmp(rop,tl);
+  const d=[emp.filter(e=>e.cohort.includes('0-3')).length,emp.filter(e=>e.cohort.includes('3-6')).length,
+    emp.filter(e=>e.cohort.includes('6-12')).length,emp.filter(e=>e.cohort.includes('12+')).length];
+  const tot=d.reduce((a,b)=>a+b,1);
+  kill('cCoh');
+  CH.cCoh=new Chart($('cCoh'),{type:'doughnut',data:{labels:['0–3 мес','3–6 мес','6–12 мес','12+ мес'],
+    datasets:[{data:d,backgroundColor:['#E74C3C','#E67E22','#3498DB','#27AE60'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw} чел. (${Math.round(ctx.raw/tot*100)}%)`}}}}});
+}
+
+function tlTable(ropF,tlF){
+  const rows=S.tl.filter(t=>(ropF==='all'||t.rop===ropF)&&(tlF==='all'||t.tl===tlF));
+  $('tltb').innerHTML=rows.length?rows.map(t=>{
+    const oN=t.c1>3,full=t.total>=10;
+    const b=full&&oN?'bdn':full||oN?'bwn':'bok';
+    const l=full&&oN?'Перегруз':full?'Полный':oN?'Много нов.':'Норма';
+    return `<tr><td><b>${t.tl}</b></td><td style="font-size:11px;color:#888">${t.rop.split(' ')[0]}</td><td>${t.c1}</td><td>${t.c2}</td><td>${t.c3}</td><td>${t.c4}</td><td><b>${t.total}</b></td><td><span class="badge ${b}">${l}</span></td></tr>`;
+  }).join(''):'<tr><td colspan="8" style="text-align:center;color:#999;padding:16px">Нет данных</td></tr>';
+}
+
+function ropCompChart(ropF){
+  const rops=ropF==='all'?[...new Set(S.tl.map(t=>t.rop).filter(Boolean))]:[ropF];
+  const lb=rops.map(r=>r.split(' ')[0]);
+  const g=(r,k)=>S.tl.filter(t=>t.rop===r).reduce((s,t)=>s+t[k],0);
+  kill('cRopC');
+  CH.cRopC=new Chart($('cRopC'),{type:'bar',data:{labels:lb,datasets:[
+    {label:'0–3',data:rops.map(r=>g(r,'c1')),backgroundColor:'rgba(231,76,60,.8)'},
+    {label:'3–6',data:rops.map(r=>g(r,'c2')),backgroundColor:'rgba(230,126,34,.8)'},
+    {label:'6–12',data:rops.map(r=>g(r,'c3')),backgroundColor:'rgba(52,152,219,.8)'},
+    {label:'12+',data:rops.map(r=>g(r,'c4')),backgroundColor:'rgba(39,174,96,.8)'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:'Чел.'}}}}});
+}
+
+function ropDetail(ropF){
+  const rops=ropF==='all'?[...new Set(S.tl.map(t=>t.rop).filter(Boolean))]:[ropF];
+  $('roptb').innerHTML=rops.map(r=>{
+    const tls=S.tl.filter(t=>t.rop===r);
+    const staff=tls.reduce((s,t)=>s+t.total,0),tlC=tls.length;
+    const lim=tlC*10,limN=tlC*3,c1=tls.reduce((s,t)=>s+t.c1,0);
+    const res=lim-staff,resN=limN-c1;
+    const st=resN<0||res<0?'bdn':resN<=2||res<=3?'bwn':'bok';
+    const l=st==='bok'?'В лимитах':st==='bwn'?'Внимание':'Перегруз';
+    return `<tr><td><b>${r}</b></td><td>${tlC}</td><td>${staff}</td><td>${lim}</td><td style="color:${res<0?'#E74C3C':'inherit'}">${res}</td><td>${c1}</td><td>${limN}</td><td><span class="badge ${st}">${l}</span></td></tr>`;
+  }).join('');
+}
+
+function tlCards(ropF,tlF){
+  const tls=S.tl.filter(t=>(ropF==='all'||t.rop===ropF)&&(tlF==='all'||t.tl===tlF));
+  $('tlcards').innerHTML=tls.map(t=>{
+    const pct=Math.min(Math.round(t.total/10*100),100);
+    const col=t.total>=10?'#E74C3C':t.total>=7?'#E67E22':'#27AE60';
+    return `<div class="card" style="padding:12px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:2px">${t.tl}</div>
+      <div style="font-size:11px;color:#888;margin-bottom:8px">${t.rop}</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>Нагрузка</span><span style="font-weight:700;color:${col}">${t.total}/10</span></div>
+      <div class="pb"><div class="pf" style="width:${pct}%;background:${col}"></div></div>
+      <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
+        <span class="tag" style="background:#FADBD8;color:#922B21">${t.c1} нов</span>
+        <span class="tag" style="background:#FDEBD0;color:#A04000">${t.c2} 3-6м</span>
+        <span class="tag" style="background:#D6EAF8;color:#1A5276">${t.c3} 6-12м</span>
+        <span class="tag" style="background:#D5F5E3;color:#1E8449">${t.c4} 12+м</span>
+      </div></div>`;
+  }).join('');
+}
+
+// ─── FORECAST ──────────────────────────────────────────────────────────────
+function fcRender(){
+  const fcM=['Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const fS=[265,282,299,348,364,369,370,370],fF=[9,12,11,12,16,18,11,8],fH=[66,29,26,62,35,25,6,10];
+  const fN=[111,111,111,111,111,101,59,36],fR=[105,88,71,22,7,1,0,0];
+  const fL=['лимит новичков','лимит новичков','лимит новичков','лимит новичков','лимит новичков','общий лимит ТЛ','общий лимит ТЛ','общий лимит ТЛ'];
+  $('fckpi').innerHTML=`
+    <div class="mc"><div class="ml">Найм май–декабрь</div><div class="mv mb">259</div><div class="ms">максимально</div></div>
+    <div class="mc"><div class="ml">Штат декабрь</div><div class="mv mg">370</div><div class="ms">целевой лимит</div></div>
+    <div class="mc"><div class="ml">Новых ТЛ нужно</div><div class="mv mo">0</div><div class="ms">при текущем найме</div></div>
+    <div class="mc"><div class="ml">Новых РОП нужно</div><div class="mv mg">0</div><div class="ms">хватает текущих</div></div>`;
+  $('fctb').innerHTML=fcM.map((m,i)=>{
+    const w=fL[i].includes('общий');
+    return `<tr><td>${m} 2026</td><td>${i===0?208:fS[i-1]}</td><td>${fF[i]}</td><td><b>${fH[i]}</b></td><td><b>${fS[i]}</b></td><td>${fN[i]}</td><td>${fR[i]}</td><td><span class="badge ${w?'bwn':'bin'}">${fL[i]}</span></td></tr>`;
+  }).join('');
+  kill('cFcM');
+  CH.cFcM=new Chart($('cFcM'),{type:'bar',data:{labels:fcM,datasets:[
+    {label:'Штат',data:fS,backgroundColor:'rgba(52,152,219,.7)',borderColor:'#3498DB',borderWidth:1},
+    {label:'Выбытие',data:fF,backgroundColor:'rgba(231,76,60,.7)',borderColor:'#E74C3C',borderWidth:1},
+    {label:'Найм',data:fH,backgroundColor:'rgba(46,204,113,.7)',borderColor:'#2ECC71',borderWidth:1},
+    {label:'Лимит',data:Array(8).fill(370),type:'line',borderColor:'rgba(243,156,18,.5)',backgroundColor:'transparent',borderDash:[6,3],pointRadius:0,borderWidth:2}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'Чел.'},beginAtZero:true}}}});
+  kill('cFcN');
+  CH.cFcN=new Chart($('cFcN'),{type:'bar',data:{labels:fcM,datasets:[
+    {label:'Новички',data:fN,backgroundColor:'rgba(155,89,182,.7)',borderColor:'#8E44AD',borderWidth:1},
+    {label:'Лимит',data:Array(8).fill(111),type:'line',borderColor:'rgba(231,76,60,.5)',backgroundColor:'transparent',borderDash:[6,3],pointRadius:0,borderWidth:2}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'Чел.'},min:0,max:130}}}});
+  const rl=[
+    {r:'Андриянов Иван',s:29,tl:6,lim:60,c1:6,lN:18,st:'bok'},
+    {r:'Байер Даниил',s:41,tl:6,lim:60,c1:5,lN:18,st:'bok'},
+    {r:'Хвалько Никита',s:58,tl:6,lim:60,c1:12,lN:18,st:'bok'},
+    {r:'Тимиряев Даниил',s:37,tl:5,lim:50,c1:4,lN:15,st:'bok'},
+    {r:'Меладинов Вадим',s:30,tl:6,lim:60,c1:7,lN:18,st:'bok'},
+    {r:'Белоусов Владислав',s:7,tl:2,lim:20,c1:7,lN:6,st:'bdn'},
+    {r:'Поздеев Кирилл',s:5,tl:0,lim:0,c1:3,lN:0,st:'bdn'},
+    {r:'Сотрихин Даниил',s:0,tl:2,lim:20,c1:0,lN:6,st:'bok'},
+    {r:'Тенкачева Светлана',s:1,tl:2,lim:20,c1:1,lN:6,st:'bok'},
+  ];
+  const ov=rl.filter(r=>r.st==='bdn').map(r=>r.r).join(', ');
+  $('ropwb').textContent=ov?'⚠ Перегруз лимита новичков: '+ov:'✅ Все РОПы в лимитах';
+  $('roplim').innerHTML=rl.map(r=>`<tr><td><b>${r.r}</b></td><td>${r.s}</td><td>${r.tl}</td><td>${r.lim}</td><td>${r.c1}</td><td>${r.lN}</td><td><span class="badge ${r.st}">${r.st==='bok'?'ОК':'Перегруз'}</span></td></tr>`).join('');
+}
+
+// ─── START ─────────────────────────────────────────────────────────────────
+reload();
+</script>
+</body>
+</html>
