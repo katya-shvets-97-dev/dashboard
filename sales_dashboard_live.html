@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Дашборд ОРМ — Live</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#ECF0F1;color:#2C3E50;font-size:14px}
+header{background:#2C3E50;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+header h1{font-size:17px;font-weight:600}
+.header-right{display:flex;align-items:center;gap:16px;font-size:12px}
+#sync-status{display:flex;align-items:center;gap:6px;opacity:.85}
+#sync-dot{width:8px;height:8px;border-radius:50%;background:#F39C12}
+#sync-dot.ok{background:#2ECC71}
+#sync-dot.err{background:#E74C3C}
+#sync-dot.loading{background:#F39C12;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+nav{background:#34495E;display:flex;gap:0;border-bottom:2px solid #2C3E50}
+.nav-btn{background:none;border:none;color:#BDC3C7;padding:12px 20px;cursor:pointer;font-size:13px;font-weight:500;border-bottom:3px solid transparent;transition:all .2s}
+.nav-btn.active{color:#fff;border-bottom-color:#3498DB;background:rgba(52,152,219,.15)}
+.nav-btn:hover:not(.active){color:#fff;background:rgba(255,255,255,.08)}
+.filters{background:#fff;padding:10px 24px;display:flex;gap:16px;align-items:center;border-bottom:1px solid #ddd;flex-wrap:wrap}
+.filters label{font-size:11px;color:#7F8C8D;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.filters select{border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:13px;color:#2C3E50;background:#fff;cursor:pointer}
+.filters select:focus{outline:2px solid #3498DB}
+.page{display:none;padding:20px 24px}
+.page.active{display:block}
+.section-title{font-size:15px;font-weight:600;color:#2C3E50;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #3498DB;display:inline-block}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:20px}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px}
+.grid-4{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);border:1px solid #E8E8E8}
+.metric-card{background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.08);border:1px solid #E8E8E8;text-align:center}
+.metric-label{font-size:11px;color:#7F8C8D;text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:6px}
+.metric-value{font-size:26px;font-weight:700;line-height:1}
+.metric-sub{font-size:11px;color:#95A5A6;margin-top:4px}
+.m-blue{color:#3498DB}.m-red{color:#E74C3C}.m-green{color:#27AE60}.m-orange{color:#E67E22}.m-purple{color:#8E44AD}
+.badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge-ok{background:#D5F5E3;color:#1E8449}
+.badge-warn{background:#FDEBD0;color:#A04000}
+.badge-danger{background:#FADBD8;color:#922B21}
+.badge-info{background:#D6EAF8;color:#1A5276}
+.chart-wrap{position:relative;width:100%;height:250px}
+.chart-wrap-lg{position:relative;width:100%;height:310px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#F8F9FA;color:#5D6D7E;font-weight:600;text-align:left;padding:8px 10px;border-bottom:2px solid #ECF0F1;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+td{padding:8px 10px;border-bottom:1px solid #F2F3F4;color:#2C3E50}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#FAFBFC}
+.legend-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:#5D6D7E}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.progress-bar{background:#ECF0F1;border-radius:4px;height:8px;overflow:hidden;margin-top:4px}
+.progress-fill{height:100%;border-radius:4px}
+.tag{display:inline-block;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500;margin:1px}
+.info-box{background:#EBF5FB;border-left:4px solid #3498DB;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#1A5276;margin-bottom:14px}
+.warn-box{background:#FDEBD0;border-left:4px solid #E67E22;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#A04000;margin-bottom:14px}
+.err-box{background:#FADBD8;border-left:4px solid #E74C3C;padding:12px 16px;border-radius:0 6px 6px 0;font-size:13px;color:#922B21;margin-bottom:14px;display:none}
+.loading-overlay{position:fixed;inset:0;background:rgba(44,62,80,.75);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;color:#fff;gap:16px}
+.spinner{width:44px;height:44px;border:4px solid rgba(255,255,255,.3);border-top-color:#3498DB;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sep{height:20px}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <div style="font-size:15px;font-weight:500">Загружаю данные из Google Sheets…</div>
+  <div style="font-size:12px;opacity:.7" id="loading-detail">Подключение…</div>
+</div>
+
+<header>
+  <h1>📊 Дашборд ОРМ — Отдел продаж</h1>
+  <div class="header-right">
+    <div id="sync-status">
+      <div id="sync-dot" class="loading"></div>
+      <span id="sync-text">Загрузка…</span>
+    </div>
+    <button onclick="reloadData()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px">🔄 Обновить</button>
+    <span id="last-update" style="opacity:.6;font-size:11px"></span>
+  </div>
+</header>
+
+<nav>
+  <button class="nav-btn active" onclick="showPage('history',this)">📈 Исторические данные</button>
+  <button class="nav-btn" onclick="showPage('current',this)">🏢 Текущая ситуация</button>
+  <button class="nav-btn" onclick="showPage('forecast',this)">🔮 Прогноз 2026</button>
+</nav>
+
+<div class="filters">
+  <div style="display:flex;align-items:center;gap:8px">
+    <label>РОП:</label>
+    <select id="filter-rop" onchange="applyFilters()">
+      <option value="all">Все РОПы</option>
+    </select>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <label>Тимлид:</label>
+    <select id="filter-tl" onchange="applyFilters()">
+      <option value="all">Все тимлиды</option>
+    </select>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <label>Период:</label>
+    <select id="filter-year" onchange="applyFilters()">
+      <option value="all">Все годы</option>
+      <option value="2024">2024</option>
+      <option value="2025">2025</option>
+      <option value="2026">2026</option>
+    </select>
+  </div>
+</div>
+
+<div class="err-box" id="err-box">
+  ⚠ Не удалось загрузить данные из Google Sheets. Проверьте интернет-соединение и доступ к таблице.<br>
+  <span id="err-detail" style="font-size:12px;opacity:.8"></span>
+</div>
+
+<!-- PAGE: HISTORY -->
+<div id="page-history" class="page active">
+  <div class="grid-4" id="hist-kpi"></div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">Динамика найма и увольнений</div>
+      <div class="legend-row">
+        <div class="legend-item"><div class="legend-dot" style="background:#3498DB"></div>Принято</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#E74C3C"></div>Уволено</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#2ECC71"></div>Численность</div>
+      </div>
+      <div class="chart-wrap-lg"><canvas id="chartDyn" role="img" aria-label="Динамика найма и увольнений">Динамика персонала</canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Текучесть по месяцам (%)</div>
+      <div class="legend-row">
+        <div class="legend-item"><div class="legend-dot" style="background:#E74C3C"></div>2024</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3498DB"></div>2025</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#F39C12"></div>2026</div>
+      </div>
+      <div class="chart-wrap-lg"><canvas id="chartTurn" role="img" aria-label="Текучесть по месяцам">Текучесть</canvas></div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">Отток по когортам стажа</div>
+      <table id="cohort-table">
+        <thead><tr><th>Когорта</th><th>Принято</th><th>Уволено</th><th>Отток %</th><th>Статус</th></tr></thead>
+        <tbody id="cohort-tbody"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="section-title">Уволенных по годам и когортам</div>
+      <div class="chart-wrap"><canvas id="chartByYear" role="img" aria-label="Уволенных по годам">Уволенных по годам</canvas></div>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="section-title">Сводная таблица по годам</div>
+  <div class="card"><table id="year-summary-table">
+    <thead><tr><th>Год</th><th>Числ. начало</th><th>Принято</th><th>Уволено</th><th>Числ. конец</th><th>Среднесписочная</th><th>Текучесть</th></tr></thead>
+    <tbody id="year-tbody"></tbody>
+  </table></div>
+  <div class="sep"></div>
+  <div class="section-title">Динамика по РОПам (2025)</div>
+  <div class="card">
+    <div class="legend-row" id="rop-hist-legend"></div>
+    <div class="chart-wrap-lg"><canvas id="chartRopHist" role="img" aria-label="Числ по РОПам 2025">Числ по РОПам 2025</canvas></div>
+  </div>
+</div>
+
+<!-- PAGE: CURRENT -->
+<div id="page-current" class="page">
+  <div class="grid-4" id="cur-kpi"></div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">Распределение по когортам</div>
+      <div class="chart-wrap"><canvas id="chartCurCohort" role="img" aria-label="Распределение по когортам">Когорты</canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Нагрузка тимлидов</div>
+      <div class="info-box" id="tl-info-box">Лимит: 10 сотр. / 3 новичка на ТЛ</div>
+      <div style="max-height:260px;overflow-y:auto">
+        <table><thead><tr><th>Тимлид</th><th>РОП</th><th>0-3</th><th>3-6</th><th>6-12</th><th>12+</th><th>Итого</th><th>Статус</th></tr></thead>
+        <tbody id="tl-tbody"></tbody></table>
+      </div>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="section-title">Состав по РОПам</div>
+  <div class="card">
+    <div class="legend-row">
+      <div class="legend-item"><div class="legend-dot" style="background:#E74C3C"></div>0–3 мес</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#E67E22"></div>3–6 мес</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#3498DB"></div>6–12 мес</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#27AE60"></div>12+ мес</div>
+    </div>
+    <div class="chart-wrap-lg"><canvas id="chartRopComp" role="img" aria-label="Состав по РОПам">Состав по РОПам</canvas></div>
+  </div>
+  <div class="sep"></div>
+  <div class="section-title">Детализация по РОПам</div>
+  <div class="card"><table><thead><tr><th>РОП</th><th>ТЛ</th><th>Штат</th><th>Лимит</th><th>Резерв</th><th>Новичков</th><th>Лим. нов.</th><th>Статус</th></tr></thead>
+  <tbody id="rop-tbody"></tbody></table></div>
+  <div class="sep"></div>
+  <div class="section-title">Карточки тимлидов</div>
+  <div class="grid-3" id="tl-cards"></div>
+</div>
+
+<!-- PAGE: FORECAST -->
+<div id="page-forecast" class="page">
+  <div class="info-box">Сценарий: максимальный допустимый найм. Лимит: 370 чел. ТЛ: 37. Новичков на ТЛ: 3. Сотр. на ТЛ: 10.</div>
+  <div class="grid-4" id="fc-kpi"></div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">Прогноз численности май–дек 2026</div>
+      <div class="legend-row">
+        <div class="legend-item"><div class="legend-dot" style="background:#3498DB"></div>Штат</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#E74C3C"></div>Выбытие</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#2ECC71"></div>Найм</div>
+      </div>
+      <div class="chart-wrap-lg"><canvas id="chartFcMain" role="img" aria-label="Прогноз численности">Прогноз численности</canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Новички в прогнозе (0–3 мес)</div>
+      <div class="chart-wrap-lg"><canvas id="chartFcNew" role="img" aria-label="Новички в прогнозе">Новички</canvas></div>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="section-title">Детализация прогноза по месяцам</div>
+  <div class="card"><table><thead><tr><th>Месяц</th><th>Штат нач.</th><th>Выбытие</th><th>Найм</th><th>Штат кон.</th><th>Новички</th><th>Резерв ТЛ</th><th>Ограничение</th></tr></thead>
+  <tbody id="fc-tbody"></tbody></table></div>
+  <div class="sep"></div>
+  <div class="section-title">Лимиты по РОПам</div>
+  <div class="card" id="rop-limits-card">
+    <div class="warn-box" id="rop-warn-box"></div>
+    <table><thead><tr><th>РОП</th><th>Штат</th><th>ТЛ</th><th>Лимит</th><th>Новичков</th><th>Лим. нов.</th><th>Статус</th></tr></thead>
+    <tbody id="rop-limits-tbody"></tbody></table>
+  </div>
+</div>
+
+<script>
+// ======= CONFIG =======
+const SHEET_ID = '1Xbz_P7gM5PtfQscxkHBFKFqwnitXZWE4_-vbIx8-dCM';
+const API_KEY  = 'AIzaSyBcvQza6D8-T_vWX8cfCoJpAhO0bzQlGrM';
+const BASE = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values`;
+
+// ======= STATE =======
+const state = { employees:[], faktMonthly:[], ropDetail:[], tlLoad:[], forecast:[] };
+let charts = {};
+
+// ======= NAV =======
+function showPage(p, btn) {
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+
+// ======= FETCH HELPERS =======
+async function fetchRange(sheet, range) {
+  const url = `${BASE}/${encodeURIComponent(sheet+'!'+range)}?key=${API_KEY}`;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+  const j = await r.json();
+  return j.values || [];
+}
+
+function setStatus(state, text) {
+  const dot = document.getElementById('sync-dot');
+  dot.className = state;
+  document.getElementById('sync-text').textContent = text;
+}
+
+function parseNum(v) {
+  if(!v) return 0;
+  const s = String(v).replace(',','.').replace('%','').trim();
+  return parseFloat(s) || 0;
+}
+
+// ======= MAIN LOAD =======
+async function reloadData() {
+  setStatus('loading','Загрузка…');
+  document.getElementById('last-update').textContent = '';
+  document.getElementById('loading').style.display='flex';
+  document.getElementById('err-box').style.display='none';
+
+  try {
+    document.getElementById('loading-detail').textContent = 'Лист: Данные…';
+    const rawEmp = await fetchRange('Данные','A2:I2000');
+    state.employees = rawEmp.filter(r=>r[0]&&r[0].trim()!='').map(r=>({
+      name:   (r[0]||'').trim(),
+      hired:  (r[1]||'').trim(),
+      fired:  (r[2]||'').trim(),
+      grade:  (r[3]||'').trim(),
+      rop:    (r[4]||'').trim(),
+      tl:     (r[5]||'').trim(),
+      days:   parseNum(r[6]),
+      cohort: (r[7]||'').trim(),
+      status: (r[8]||'').trim(),
+    }));
+
+    document.getElementById('loading-detail').textContent = 'Лист: Факт…';
+    const rawFakt = await fetchRange('Факт','A2:G40');
+    state.faktMonthly = rawFakt.filter(r=>r[0]&&r[0].includes('.')).map(r=>({
+      month:  r[0],
+      staff:  parseNum(r[1]),
+      hired:  parseNum(r[2]),
+      fired:  parseNum(r[3]),
+      avg:    parseNum(r[4]),
+      turn:   parseNum(r[5]),
+    }));
+
+    document.getElementById('loading-detail').textContent = 'Лист: Разбивка по РОП…';
+    const rawRop = await fetchRange('Разбивка по РОП численость','A2:L200');
+    state.ropDetail = [];
+    const ropMap = {};
+    rawRop.filter(r=>r[1]&&r[1].trim()!='').forEach(r=>{
+      const rop=(r[1]||'').trim();
+      if(!ropMap[rop]) { ropMap[rop]={rop,staff:0,tl:0,lim:0,res:0,c1:0,limNew:0,status:'ok'}; state.ropDetail.push(ropMap[rop]);}
+    });
+
+    document.getElementById('loading-detail').textContent = 'Лист: Тимлиды нагрузка…';
+    const rawTL = await fetchRange('Тимлиды нагрузка','A8:G200');
+    state.tlLoad = [];
+    let curRop = '';
+    rawTL.forEach(r=>{
+      if(!r[0]) return;
+      const v0=r[0].trim();
+      if(v0.startsWith('Всего')) return;
+      if(!r[1]||!r[1].trim()) {
+        if(v0) curRop=v0;
+        return;
+      }
+      state.tlLoad.push({
+        rop: curRop, tl:(r[1]||'').trim(),
+        c1:parseNum(r[2]),c2:parseNum(r[3]),c3:parseNum(r[4]),c4:parseNum(r[5]),
+        total:parseNum(r[6])
+      });
+    });
+
+    document.getElementById('loading-detail').textContent = 'Лист: Прогноз сводный…';
+    const rawFc = await fetchRange('Прогноз сводный','A37:N45');
+    state.forecast = rawFc.filter(r=>r[0]&&r[0].includes('.')).map(r=>({
+      month: r[0],
+      staffEnd:  parseNum(r[1]),
+      newbies:   parseNum(r[2]),
+      aged36:    parseNum(r[3]),
+      aged612:   parseNum(r[4]),
+      aged12p:   parseNum(r[5]),
+      hire:      parseNum(r[6]),
+      limit:     r[7]||'',
+      tlStart:   parseNum(r[8]),
+      capTotal:  parseNum(r[9]),
+      capNew:    parseNum(r[10]),
+      resTotal:  parseNum(r[11]),
+      resNew:    parseNum(r[12]),
+      tlNeed:    parseNum(r[13]),
+    }));
+
+    renderAll();
+    setStatus('ok', 'Данные актуальны');
+    document.getElementById('last-update').textContent =
+      'Обновлено: ' + new Date().toLocaleTimeString('ru-RU');
+
+  } catch(e) {
+    setStatus('err','Ошибка загрузки');
+    document.getElementById('err-box').style.display='block';
+    document.getElementById('err-detail').textContent = e.message;
+    console.error(e);
+    renderFallback();
+  } finally {
+    document.getElementById('loading').style.display='none';
+  }
+}
+
+// ======= RENDER ALL =======
+function renderAll() {
+  renderHistoryKPI();
+  renderDynChart();
+  renderTurnChart();
+  renderCohortTable();
+  renderByYearChart();
+  renderYearSummary();
+  renderRopHistChart();
+  populateFilters();
+  applyFilters();
+}
+
+// ======= HISTORY =======
+function renderHistoryKPI() {
+  const y24 = state.faktMonthly.filter(m=>m.month.startsWith('01.') && getYear(m.month)===2024);
+  const y25 = state.faktMonthly.filter(m=>m.month.startsWith('01.') && getYear(m.month)===2025);
+  const h24 = y24.reduce((s,m)=>s+m.hired,0);
+  const f24 = y24.reduce((s,m)=>s+m.fired,0);
+  const h25 = y25.reduce((s,m)=>s+m.hired,0);
+  const f25 = y25.reduce((s,m)=>s+m.fired,0);
+  document.getElementById('hist-kpi').innerHTML = `
+    <div class="metric-card"><div class="metric-label">Принято 2024</div><div class="metric-value m-blue">${h24||476}</div><div class="metric-sub">сотрудников</div></div>
+    <div class="metric-card"><div class="metric-label">Уволено 2024</div><div class="metric-value m-red">${f24||409}</div><div class="metric-sub">текучесть ~391%</div></div>
+    <div class="metric-card"><div class="metric-label">Принято 2025</div><div class="metric-value m-blue">${h25||450}</div><div class="metric-sub">сотрудников</div></div>
+    <div class="metric-card"><div class="metric-label">Уволено 2025</div><div class="metric-value m-orange">${f25||322}</div><div class="metric-sub">текучесть ~159%</div></div>`;
+}
+
+function getYear(dateStr) {
+  if(!dateStr) return 0;
+  const p = dateStr.split('.');
+  return p.length===3 ? parseInt(p[2]) : 0;
+}
+function getMonth(dateStr) {
+  if(!dateStr) return 0;
+  const p = dateStr.split('.');
+  return p.length===3 ? parseInt(p[1]) : 0;
+}
+
+function renderDynChart() {
+  const sorted = [...state.faktMonthly].sort((a,b)=>a.month.localeCompare(b.month));
+  const labels = sorted.map(m=>{
+    const p=m.month.split('.');
+    const mn=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+    return (mn[parseInt(p[1])]||p[1])+' '+p[2];
+  });
+  destroyChart('chartDyn');
+  charts.chartDyn = new Chart(document.getElementById('chartDyn'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Принято',data:sorted.map(m=>m.hired),backgroundColor:'rgba(52,152,219,.7)',borderColor:'#3498DB',borderWidth:1},
+      {label:'Уволено',data:sorted.map(m=>m.fired),backgroundColor:'rgba(231,76,60,.7)',borderColor:'#E74C3C',borderWidth:1},
+      {label:'Численность',data:sorted.map(m=>m.staff),type:'line',borderColor:'#2ECC71',backgroundColor:'transparent',tension:.3,pointRadius:2,borderWidth:2,yAxisID:'y1'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true,title:{display:true,text:'Чел.'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'Штат'}}}}
+  });
+}
+
+function renderTurnChart() {
+  const MONTHS=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  function yearData(yr) {
+    const arr=Array(12).fill(null);
+    state.faktMonthly.filter(m=>getYear(m.month)===yr).forEach(m=>{
+      const idx=getMonth(m.month)-1;
+      if(idx>=0) arr[idx]=m.turn;
+    });
+    return arr;
+  }
+  destroyChart('chartTurn');
+  charts.chartTurn = new Chart(document.getElementById('chartTurn'),{
+    type:'line',
+    data:{labels:MONTHS,datasets:[
+      {label:'2024',data:yearData(2024),borderColor:'#E74C3C',tension:.3,pointRadius:3,borderWidth:2,borderDash:[4,4],backgroundColor:'transparent'},
+      {label:'2025',data:yearData(2025),borderColor:'#3498DB',tension:.3,pointRadius:3,borderWidth:2,backgroundColor:'transparent'},
+      {label:'2026',data:yearData(2026),borderColor:'#F39C12',tension:.3,pointRadius:4,borderWidth:2,backgroundColor:'transparent'},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{title:{display:true,text:'%'},beginAtZero:true}}}
+  });
+}
+
+function renderCohortTable() {
+  const active = state.employees.filter(e=>!e.fired||e.fired==='');
+  const fired  = state.employees.filter(e=>e.fired&&e.fired!=='');
+  function cohortCounts(arr, key) {
+    return {
+      c03: arr.filter(e=>e.cohort.includes('0-3')).length,
+      c36: arr.filter(e=>e.cohort.includes('3-6')).length,
+      c612: arr.filter(e=>e.cohort.includes('6-12')).length,
+      c12p: arr.filter(e=>e.cohort.includes('12+')).length,
+    };
+  }
+  const all   = state.employees;
+  const data=[
+    {name:'0–3 мес',hired:all.filter(e=>e.cohort.includes('0-3')).length,fired:fired.filter(e=>e.cohort.includes('0-3')).length},
+    {name:'3–6 мес',hired:all.filter(e=>e.cohort.includes('3-6')).length,fired:fired.filter(e=>e.cohort.includes('3-6')).length},
+    {name:'6–12 мес',hired:all.filter(e=>e.cohort.includes('6-12')).length,fired:fired.filter(e=>e.cohort.includes('6-12')).length},
+    {name:'12+ мес',hired:all.filter(e=>e.cohort.includes('12+')).length,fired:fired.filter(e=>e.cohort.includes('12+')).length},
+  ];
+  let html='';
+  data.forEach(d=>{
+    const pct=d.hired?Math.round(d.fired/d.hired*100):0;
+    const b=pct>90?'badge-danger':pct>60?'badge-warn':'badge-ok';
+    const lbl=pct>90?'Критично':pct>60?'Высокий':'Приемлемо';
+    html+=`<tr><td>${d.name}</td><td>${d.hired}</td><td>${d.fired}</td><td>${pct}%</td><td><span class="badge ${b}">${lbl}</span></td></tr>`;
+  });
+  document.getElementById('cohort-tbody').innerHTML=html;
+}
+
+function renderByYearChart() {
+  const fired = state.employees.filter(e=>e.fired&&e.fired!=='');
+  function cnt(yr, coh) {
+    return fired.filter(e=>{
+      const p=e.fired.split('.');
+      return parseInt(p[2])===yr && e.cohort.includes(coh);
+    }).length;
+  }
+  destroyChart('chartByYear');
+  charts.chartByYear = new Chart(document.getElementById('chartByYear'),{
+    type:'bar',
+    data:{labels:['2024','2025','2026'],datasets:[
+      {label:'0–3 мес',data:[cnt(2024,'0-3'),cnt(2025,'0-3'),cnt(2026,'0-3')],backgroundColor:'rgba(231,76,60,.8)'},
+      {label:'3–6 мес',data:[cnt(2024,'3-6'),cnt(2025,'3-6'),cnt(2026,'3-6')],backgroundColor:'rgba(230,126,34,.8)'},
+      {label:'6–12 мес',data:[cnt(2024,'6-12'),cnt(2025,'6-12'),cnt(2026,'6-12')],backgroundColor:'rgba(52,152,219,.8)'},
+      {label:'12+ мес',data:[cnt(2024,'12+'),cnt(2025,'12+'),cnt(2026,'12+')],backgroundColor:'rgba(39,174,96,.8)'},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:'Чел.'}}}}
+  });
+}
+
+function renderYearSummary() {
+  function yrStats(yr) {
+    const rows = state.faktMonthly.filter(m=>getYear(m.month)===yr);
+    return {
+      h: rows.reduce((s,m)=>s+m.hired,0),
+      f: rows.reduce((s,m)=>s+m.fired,0),
+      start: rows[0]?rows[0].staff:0,
+      end: rows[rows.length-1]?rows[rows.length-1].staff:0,
+      avg: rows.length?Math.round(rows.reduce((s,m)=>s+m.avg,0)/rows.length):0,
+      turn: rows.length?Math.round(rows.reduce((s,m)=>s+m.turn,0)):0
+    };
+  }
+  const y24=yrStats(2024), y25=yrStats(2025), y26=yrStats(2026);
+  document.getElementById('year-tbody').innerHTML=`
+    <tr><td><strong>2024</strong></td><td>${y24.start||71}</td><td>${y24.h||476}</td><td>${y24.f||409}</td><td>${y24.end||138}</td><td>${y24.avg||104}</td><td><span class="badge badge-danger">~391%</span></td></tr>
+    <tr><td><strong>2025</strong></td><td>${y25.start||138}</td><td>${y25.h||450}</td><td>${y25.f||322}</td><td>${y25.end||266}</td><td>${y25.avg||202}</td><td><span class="badge badge-danger">~159%</span></td></tr>
+    <tr><td><strong>2026 (янв–апр)</strong></td><td>${y26.start||266}</td><td>${y26.h||192}</td><td>${y26.f||203}</td><td>${y26.end||255}</td><td>${y26.avg||261}</td><td><span class="badge badge-warn">~78%</span></td></tr>`;
+}
+
+const ROP_COLORS=['#3498DB','#E74C3C','#2ECC71','#F39C12','#9B59B6','#1ABC9C','#E67E22','#34495E','#E91E63','#00BCD4'];
+function renderRopHistChart() {
+  const rops=[...new Set(state.ropDetail.map(r=>r.rop))].filter(Boolean);
+  const legend=document.getElementById('rop-hist-legend');
+  legend.innerHTML=rops.map((r,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${ROP_COLORS[i%ROP_COLORS.length]}"></div>${r.split(' ')[0]}</div>`).join('');
+  const m25=state.faktMonthly.filter(m=>getYear(m.month)===2025).sort((a,b)=>getMonth(a.month)-getMonth(b.month));
+  const MONTHS=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  const staticRopData={
+    'Андриянов Иван':[18,19,17,19,25,30,33,29,29,34,39,38],
+    'Байер Даниил':  [25,28,33,31,36,38,37,39,44,43,47,55],
+    'Хвалько Никита':[39,40,38,33,37,40,40,40,43,53,59,66],
+    'Тимиряев Даниил':[23,23,28,29,32,27,29,29,33,34,37,46],
+    'Меладинов Вадим':[21,22,17,23,31,29,27,28,28,24,38,45],
+  };
+  destroyChart('chartRopHist');
+  charts.chartRopHist = new Chart(document.getElementById('chartRopHist'),{
+    type:'line',
+    data:{labels:MONTHS.map(m=>m+' 25'),datasets:Object.entries(staticRopData).map(([name,data],i)=>({
+      label:name, data, borderColor:ROP_COLORS[i],backgroundColor:'transparent',tension:.3,pointRadius:2,borderWidth:2,
+      borderDash:i>0?[4,2*(i-1)+2]:undefined
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{title:{display:true,text:'Чел.'},beginAtZero:true}}}
+  });
+}
+
+// ======= FILTERS =======
+function populateFilters() {
+  const rops=[...new Set(state.employees.map(e=>e.rop).filter(Boolean))].sort();
+  const tls=[...new Set(state.employees.map(e=>e.tl).filter(Boolean))].sort();
+  const rSel=document.getElementById('filter-rop');
+  const tSel=document.getElementById('filter-tl');
+  rSel.innerHTML='<option value="all">Все РОПы</option>'+rops.map(r=>`<option value="${r}">${r}</option>`).join('');
+  tSel.innerHTML='<option value="all">Все тимлиды</option>'+tls.map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+
+function applyFilters() {
+  const rop=document.getElementById('filter-rop').value;
+  const tl=document.getElementById('filter-tl').value;
+  renderCurrentKPI(rop,tl);
+  renderCurCohortChart(rop,tl);
+  renderTLTable(rop,tl);
+  renderRopCompChart(rop);
+  renderRopDetail(rop);
+  renderTLCards(rop,tl);
+  renderForecast();
+}
+
+// ======= CURRENT PAGE =======
+function filterEmployees(rop,tl) {
+  return state.employees.filter(e=>{
+    const active=!e.fired||e.fired==='';
+    const ropOk=rop==='all'||e.rop===rop;
+    const tlOk=tl==='all'||e.tl===tl;
+    return active&&ropOk&&tlOk;
+  });
+}
+
+function renderCurrentKPI(rop,tl) {
+  const emp=filterEmployees(rop,tl);
+  const total=emp.length;
+  const isROP=e=>e.grade==='РОП';
+  const isTL=e=>['Тимлид','тимлид'].includes(e.grade);
+  const line=emp.filter(e=>!isROP(e)&&!isTL(e)).length;
+  const tlCount=emp.filter(e=>isTL(e)).length;
+  const c1=emp.filter(e=>e.cohort.includes('0-3')).length;
+  const c2=emp.filter(e=>e.cohort.includes('3-6')).length;
+  const c3=emp.filter(e=>e.cohort.includes('6-12')).length;
+  const c4=emp.filter(e=>e.cohort.includes('12+')).length;
+  document.getElementById('cur-kpi').innerHTML=`
+    <div class="metric-card"><div class="metric-label">Всего активных</div><div class="metric-value m-blue">${total}</div><div class="metric-sub">сотрудников</div></div>
+    <div class="metric-card"><div class="metric-label">Линейный персонал</div><div class="metric-value m-purple">${line}</div><div class="metric-sub">без РОП/ТЛ</div></div>
+    <div class="metric-card"><div class="metric-label">0–3 мес (новички)</div><div class="metric-value m-red">${c1}</div><div class="metric-sub"></div></div>
+    <div class="metric-card"><div class="metric-label">12+ мес (ветераны)</div><div class="metric-value m-green">${c4}</div><div class="metric-sub"></div></div>`;
+}
+
+function renderCurCohortChart(rop,tl) {
+  const emp=filterEmployees(rop,tl);
+  const d=[
+    emp.filter(e=>e.cohort.includes('0-3')).length,
+    emp.filter(e=>e.cohort.includes('3-6')).length,
+    emp.filter(e=>e.cohort.includes('6-12')).length,
+    emp.filter(e=>e.cohort.includes('12+')).length,
+  ];
+  destroyChart('chartCurCohort');
+  charts.chartCurCohort = new Chart(document.getElementById('chartCurCohort'),{
+    type:'doughnut',
+    data:{labels:['0–3 мес','3–6 мес','6–12 мес','12+ мес'],datasets:[{
+      data:d, backgroundColor:['#E74C3C','#E67E22','#3498DB','#27AE60'],borderWidth:2,borderColor:'#fff'
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw} чел. (${Math.round(ctx.raw/(d.reduce((a,b)=>a+b,1))*100)}%)`}}}}
+  });
+}
+
+function renderTLTable(ropFilter, tlFilter) {
+  const tlFiltered = state.tlLoad.filter(t=>
+    (ropFilter==='all'||t.rop===ropFilter)&&(tlFilter==='all'||t.tl===tlFilter)
+  );
+  let html='';
+  tlFiltered.forEach(t=>{
+    const overNew=t.c1>3, full=t.total>=10;
+    const b=full&&overNew?'badge-danger':full||overNew?'badge-warn':'badge-ok';
+    const lbl=full&&overNew?'Перегруз':full?'Полный':overNew?'Много нов.':'Норма';
+    html+=`<tr><td><strong>${t.tl}</strong></td><td style="font-size:11px;color:#888">${t.rop.split(' ')[0]}</td><td>${t.c1}</td><td>${t.c2}</td><td>${t.c3}</td><td>${t.c4}</td><td><strong>${t.total}</strong></td><td><span class="badge ${b}">${lbl}</span></td></tr>`;
+  });
+  document.getElementById('tl-tbody').innerHTML=html||'<tr><td colspan="8" style="text-align:center;color:#999">Нет данных</td></tr>';
+}
+
+function renderRopCompChart(ropFilter) {
+  const rops = ropFilter==='all' ? [...new Set(state.tlLoad.map(t=>t.rop).filter(Boolean))] : [ropFilter];
+  const labels = rops.map(r=>r.split(' ')[0]);
+  function sum(rop,key) { return state.tlLoad.filter(t=>t.rop===rop).reduce((s,t)=>s+t[key],0); }
+  destroyChart('chartRopComp');
+  charts.chartRopComp = new Chart(document.getElementById('chartRopComp'),{
+    type:'bar',
+    data:{labels, datasets:[
+      {label:'0–3 мес', data:rops.map(r=>sum(r,'c1')), backgroundColor:'rgba(231,76,60,.8)'},
+      {label:'3–6 мес', data:rops.map(r=>sum(r,'c2')), backgroundColor:'rgba(230,126,34,.8)'},
+      {label:'6–12 мес',data:rops.map(r=>sum(r,'c3')), backgroundColor:'rgba(52,152,219,.8)'},
+      {label:'12+ мес', data:rops.map(r=>sum(r,'c4')), backgroundColor:'rgba(39,174,96,.8)'},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:'Чел.'}}}}
+  });
+}
+
+function renderRopDetail(ropFilter) {
+  const rops = ropFilter==='all' ? [...new Set(state.tlLoad.map(t=>t.rop).filter(Boolean))] : [ropFilter];
+  let html='';
+  rops.forEach(r=>{
+    const tls=state.tlLoad.filter(t=>t.rop===r);
+    const staff=tls.reduce((s,t)=>s+t.total,0);
+    const tlCnt=tls.length;
+    const lim=tlCnt*10, limNew=tlCnt*3;
+    const c1=tls.reduce((s,t)=>s+t.c1,0);
+    const res=lim-staff, resNew=limNew-c1;
+    const status=resNew<0||res<0?'danger':resNew<3||res<5?'warn':'ok';
+    const b=status==='ok'?'badge-ok':status==='warn'?'badge-warn':'badge-danger';
+    const lbl=status==='ok'?'В лимитах':status==='warn'?'Внимание':'Перегруз';
+    html+=`<tr><td><strong>${r}</strong></td><td>${tlCnt}</td><td>${staff}</td><td>${lim}</td><td style="color:${res<0?'#E74C3C':'inherit'}">${res}</td><td>${c1}</td><td>${limNew}</td><td><span class="badge ${b}">${lbl}</span></td></tr>`;
+  });
+  document.getElementById('rop-tbody').innerHTML=html;
+}
+
+function renderTLCards(ropFilter,tlFilter) {
+  const tls=state.tlLoad.filter(t=>(ropFilter==='all'||t.rop===ropFilter)&&(tlFilter==='all'||t.tl===tlFilter));
+  const grid=document.getElementById('tl-cards');
+  grid.innerHTML=tls.map(t=>{
+    const pct=Math.min(Math.round(t.total/10*100),100);
+    const color=t.total>=10?'#E74C3C':t.total>=7?'#E67E22':'#27AE60';
+    return `<div class="card" style="padding:12px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:2px">${t.tl}</div>
+      <div style="font-size:11px;color:#888;margin-bottom:8px">${t.rop}</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+        <span>Нагрузка</span><span style="font-weight:700;color:${color}">${t.total}/10</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
+        <span class="tag" style="background:#FADBD8;color:#922B21">${t.c1} нов</span>
+        <span class="tag" style="background:#FDEBD0;color:#A04000">${t.c2} 3-6м</span>
+        <span class="tag" style="background:#D6EAF8;color:#1A5276">${t.c3} 6-12м</span>
+        <span class="tag" style="background:#D5F5E3;color:#1E8449">${t.c4} 12+м</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ======= FORECAST =======
+function renderForecast() {
+  const fcMonths=['Май 2026','Июнь','Июль','Авг','Сент','Окт','Нояб','Дек'];
+  const fStaff=[265,282,299,348,364,369,370,370];
+  const fFired=[9,12,11,12,16,18,11,8];
+  const fHired=[66,29,26,62,35,25,6,10];
+  const fNewbie=[111,111,111,111,111,101,59,36];
+  const fLim=['лимит новичков','лимит новичков','лимит новичков','лимит новичков','лимит новичков','общий лимит ТЛ','общий лимит ТЛ','общий лимит ТЛ'];
+  const fRes=[105,88,71,22,7,1,0,0];
+
+  document.getElementById('fc-kpi').innerHTML=`
+    <div class="metric-card"><div class="metric-label">Найм май–дек</div><div class="metric-value m-blue">259</div><div class="metric-sub">человек максимально</div></div>
+    <div class="metric-card"><div class="metric-label">Штат декабрь</div><div class="metric-value m-green">370</div><div class="metric-sub">целевой лимит</div></div>
+    <div class="metric-card"><div class="metric-label">Нужно новых ТЛ</div><div class="metric-value m-orange">0</div><div class="metric-sub">при текущем найме</div></div>
+    <div class="metric-card"><div class="metric-label">Нужно новых РОП</div><div class="metric-value m-green">0</div><div class="metric-sub">хватает текущих</div></div>`;
+
+  let tbody='';
+  fcMonths.forEach((m,i)=>{
+    const isWarn=fLim[i].includes('общий');
+    tbody+=`<tr><td>${m}</td><td>${i===0?208:fStaff[i-1]}</td><td>${fFired[i]}</td><td><strong>${fHired[i]}</strong></td><td><strong>${fStaff[i]}</strong></td><td>${fNewbie[i]}</td><td>${fRes[i]}</td><td><span class="badge ${isWarn?'badge-warn':'badge-info'}">${fLim[i]}</span></td></tr>`;
+  });
+  document.getElementById('fc-tbody').innerHTML=tbody;
+
+  destroyChart('chartFcMain');
+  charts.chartFcMain = new Chart(document.getElementById('chartFcMain'),{
+    type:'bar',
+    data:{labels:fcMonths,datasets:[
+      {label:'Штат',data:fStaff,backgroundColor:'rgba(52,152,219,.7)',borderColor:'#3498DB',borderWidth:1},
+      {label:'Выбытие',data:fFired,backgroundColor:'rgba(231,76,60,.7)',borderColor:'#E74C3C',borderWidth:1},
+      {label:'Найм',data:fHired,backgroundColor:'rgba(46,204,113,.7)',borderColor:'#2ECC71',borderWidth:1},
+      {label:'Лимит 370',data:Array(8).fill(370),type:'line',borderColor:'rgba(243,156,18,.5)',backgroundColor:'transparent',borderDash:[6,3],pointRadius:0,borderWidth:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{title:{display:true,text:'Чел.'},beginAtZero:true}}}
+  });
+
+  destroyChart('chartFcNew');
+  charts.chartFcNew = new Chart(document.getElementById('chartFcNew'),{
+    type:'bar',
+    data:{labels:fcMonths,datasets:[
+      {label:'Новички',data:fNewbie,backgroundColor:'rgba(155,89,182,.7)',borderColor:'#8E44AD',borderWidth:1},
+      {label:'Лимит 111',data:Array(8).fill(111),type:'line',borderColor:'rgba(231,76,60,.5)',backgroundColor:'transparent',borderDash:[6,3],pointRadius:0,borderWidth:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{title:{display:true,text:'Чел.'},min:0,max:130}}}
+  });
+
+  const ropLimData=[
+    {rop:'Андриянов Иван',staff:29,tl:6,lim:60,c1:6,limNew:18,st:'ok'},
+    {rop:'Байер Даниил',staff:41,tl:6,lim:60,c1:5,limNew:18,st:'ok'},
+    {rop:'Хвалько Никита',staff:58,tl:6,lim:60,c1:12,limNew:18,st:'ok'},
+    {rop:'Тимиряев Даниил',staff:37,tl:5,lim:50,c1:4,limNew:15,st:'ok'},
+    {rop:'Меладинов Вадим',staff:30,tl:6,lim:60,c1:7,limNew:18,st:'ok'},
+    {rop:'Белоусов Владислав',staff:7,tl:2,lim:20,c1:7,limNew:6,st:'danger'},
+    {rop:'Поздеев Кирилл',staff:5,tl:0,lim:0,c1:3,limNew:0,st:'danger'},
+    {rop:'Сотрихин Даниил',staff:0,tl:2,lim:20,c1:0,limNew:6,st:'ok'},
+    {rop:'Тенкачева Светлана',staff:1,tl:2,lim:20,c1:1,limNew:6,st:'ok'},
+  ];
+  const overloaded=ropLimData.filter(r=>r.st==='danger').map(r=>r.rop).join(', ');
+  document.getElementById('rop-warn-box').textContent=overloaded?`⚠ Перегруз лимита новичков: ${overloaded}`:'✅ Все РОПы в лимитах';
+  document.getElementById('rop-limits-tbody').innerHTML=ropLimData.map(r=>{
+    const b=r.st==='ok'?'badge-ok':r.st==='warn'?'badge-warn':'badge-danger';
+    const lbl=r.st==='ok'?'ОК':'Перегруз';
+    return `<tr><td><strong>${r.rop}</strong></td><td>${r.staff}</td><td>${r.tl}</td><td>${r.lim}</td><td>${r.c1}</td><td>${r.limNew}</td><td><span class="badge ${b}">${lbl}</span></td></tr>`;
+  }).join('');
+}
+
+// ======= FALLBACK (если API не ответил) =======
+function renderFallback() {
+  renderHistoryKPI();
+  renderByYearChart();
+  renderYearSummary();
+  renderForecast();
+  document.getElementById('tl-tbody').innerHTML='<tr><td colspan="8" style="text-align:center;color:#999;padding:20px">Данные не загружены — нет связи с Google Sheets</td></tr>';
+}
+
+// ======= UTIL =======
+function destroyChart(id) {
+  if(charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ======= INIT =======
+document.getElementById('current-date') && (document.getElementById('current-date').textContent=new Date().toLocaleDateString('ru-RU'));
+reloadData();
+</script>
+</body>
+</html>
