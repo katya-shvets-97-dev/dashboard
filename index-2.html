@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Дашборд отдела продаж</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
+  <style>
+    :root{
+      --bg:#f6f6f6; --card:#fff; --text:#111; --muted:#6b7280; --line:#e5e7eb;
+      --dark:#111827; --mid:#6b7280; --soft:#d1d5db; --shadow:0 12px 30px rgba(0,0,0,.08);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; background:var(--bg); color:var(--text)}
+    header{position:sticky; top:0; z-index:10; background:rgba(246,246,246,.88); backdrop-filter:blur(10px); border-bottom:1px solid var(--line)}
+    .wrap{max-width:1280px; margin:0 auto; padding:18px}
+    .top{display:flex; align-items:flex-start; justify-content:space-between; gap:16px}
+    h1{font-size:24px; margin:0 0 6px; letter-spacing:-.02em}
+    .subtitle{font-size:13px; color:var(--muted)}
+    .status{font-size:12px; color:var(--muted); text-align:right; line-height:1.45}
+    .filters{display:grid; grid-template-columns:repeat(4,minmax(160px,1fr)); gap:12px; margin-top:16px}
+    label{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:6px}
+    select,input{width:100%; border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:#fff; color:#111; outline:none}
+    button{border:1px solid #111; background:#111; color:#fff; border-radius:12px; padding:10px 14px; cursor:pointer; font-weight:600}
+    button.secondary{background:#fff; color:#111; border-color:var(--line)}
+    .tabs{display:flex; gap:8px; flex-wrap:wrap; margin:18px 0 0}
+    .tab{padding:10px 14px; border:1px solid var(--line); background:#fff; border-radius:999px; cursor:pointer; color:#111}
+    .tab.active{background:#111; color:#fff; border-color:#111}
+    .grid{display:grid; grid-template-columns:repeat(12,1fr); gap:16px; margin-top:16px}
+    .card{background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; border:1px solid rgba(0,0,0,.03)}
+    .kpi{grid-column:span 3; min-height:112px}
+    .kpi .name{font-size:13px; color:var(--muted); margin-bottom:10px}
+    .kpi .value{font-size:32px; font-weight:800; letter-spacing:-.03em}
+    .kpi .note{font-size:12px; color:var(--muted); margin-top:6px}
+    .span4{grid-column:span 4}.span5{grid-column:span 5}.span6{grid-column:span 6}.span7{grid-column:span 7}.span8{grid-column:span 8}.span12{grid-column:span 12}
+    .card h2{font-size:17px; margin:0 0 14px; letter-spacing:-.01em}
+    .table-wrap{overflow:auto; border:1px solid var(--line); border-radius:14px}
+    table{width:100%; border-collapse:collapse; font-size:13px; min-width:620px; background:#fff}
+    th,td{padding:11px 12px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap}
+    th{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); background:#fafafa}
+    tr:last-child td{border-bottom:0}
+    .hint{font-size:13px; color:var(--muted); line-height:1.5}
+    .error{background:#fff3f3; border:1px solid #ffd0d0; color:#7f1d1d; border-radius:14px; padding:12px; margin-top:12px; display:none}
+    .empty{padding:24px; color:var(--muted); text-align:center}
+    canvas{max-height:360px}
+    @media(max-width:900px){.filters{grid-template-columns:1fr 1fr}.kpi{grid-column:span 6}.span4,.span5,.span6,.span7,.span8{grid-column:span 12}.top{display:block}.status{text-align:left; margin-top:10px}}
+    @media(max-width:560px){.wrap{padding:12px}.filters{grid-template-columns:1fr}.kpi{grid-column:span 12}h1{font-size:21px}.kpi .value{font-size:28px}.card{padding:14px}.tab{width:100%; text-align:center}.grid{gap:12px}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>Дашборд отдела продаж</h1>
+        <div class="subtitle">История, текущая ситуация и прогноз численности на 2026 год</div>
+      </div>
+      <div class="status" id="status">Ожидание подключения к Google Sheets</div>
+    </div>
+    <div class="filters">
+      <div>
+        <label for="sheetId">ID Google Sheets</label>
+        <input id="sheetId" placeholder="1AbC..." />
+      </div>
+      <div>
+        <label for="ropFilter">РОП</label>
+        <select id="ropFilter"><option value="__all">Все РОПы</option></select>
+      </div>
+      <div>
+        <label for="tlFilter">Тимлид</label>
+        <select id="tlFilter"><option value="__all">Все тимлиды</option></select>
+      </div>
+      <div>
+        <label for="periodFilter">Период</label>
+        <select id="periodFilter"><option>2024</option><option>2025</option><option selected>2026</option></select>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-page="history">Исторические данные</button>
+      <button class="tab" data-page="current">Текущая ситуация</button>
+      <button class="tab" data-page="forecast">Прогноз на 2026</button>
+      <button id="reload" class="secondary">Обновить</button>
+    </div>
+    <div class="error" id="errorBox"></div>
+  </div>
+</header>
+<main class="wrap" id="app"></main>
+
+<script>
+const CONFIG = {
+  refreshMs: 60_000,
+  requiredSheets: [
+    'прогноз сводный',
+    'текучесть кадров',
+    'Разбивка по РОП численость',
+    'Тимлиды нагрузка',
+    'текущая ситуация',
+    'исторические данные'
+  ],
+  // Если файл закрытый, используйте Apps Script / серверный прокси. Для быстрого варианта лист публикуется в web.
+};
+
+const state = { raw:{}, page:'history', rop:'__all', tl:'__all', period:'2026', charts:[], lastLoad:null };
+const qs = new URLSearchParams(location.search);
+const sheetIdInput = document.getElementById('sheetId');
+sheetIdInput.value = localStorage.getItem('salesDashboardSheetId') || qs.get('sheetId') || '';
+
+const $ = s => document.querySelector(s);
+const app = $('#app');
+const fmt = new Intl.NumberFormat('ru-RU');
+const pct = v => isFinite(v) ? `${(Number(v)*100).toFixed(1).replace('.', ',')}%` : '—';
+const num = v => isFinite(Number(v)) ? fmt.format(Number(v)) : '—';
+
+const aliases = {
+  rop:['роп','руководитель отдела продаж','руководитель','rop'],
+  tl:['тимлид','тл','teamlead','team lead','tl'],
+  employee:['фио','сотрудник','менеджер','фио сотрудника','фио менеджера'],
+  month:['месяц','month','период'],
+  year:['год','year'],
+  cohort:['когорта','стаж','группа','возрастная группа','стаж группа'],
+  staff:['штат','численность','сотрудники','кол-во','количество','headcount'],
+  fired:['уволено','уволенные','ушло','увольнения','fired'],
+  hired:['принято','нанято','новички','прием','hired'],
+  turnover:['текучесть','текучка','% текучести','turnover'],
+  forecastStaff:['прогноз численности','численность прогноз','итоговая численность','штат прогноз'],
+  survival:['выживаемость','survival'],
+  load:['нагрузка','нагрузка тимлида','количество на тимлида'],
+  limit:['лимит','предельная нагрузка','максимум']
+};
+function norm(s){return String(s ?? '').trim().toLowerCase().replaceAll('ё','е').replace(/\s+/g,' ')}
+function pick(row,key){
+  const ns = Object.keys(row); const want = aliases[key] || [key];
+  for(const w of want){ const found = ns.find(k => norm(k) === norm(w)); if(found) return row[found]; }
+  for(const w of want){ const found = ns.find(k => norm(k).includes(norm(w))); if(found) return row[found]; }
+  return undefined;
+}
+function asNumber(v){
+  if(v === undefined || v === null || v === '') return NaN;
+  if(typeof v === 'number') return v;
+  let s = String(v).replace(/\s/g,'').replace('%','').replace(',','.');
+  const n = Number(s);
+  if(!isFinite(n)) return NaN;
+  return String(v).includes('%') ? n/100 : n;
+}
+function unique(arr){return [...new Set(arr.filter(v => v !== undefined && v !== null && String(v).trim() !== '').map(v => String(v).trim()))].sort((a,b)=>a.localeCompare(b,'ru'))}
+function getYear(row){
+  const y = asNumber(pick(row,'year'));
+  if(isFinite(y)) return String(Math.trunc(y));
+  const m = String(pick(row,'month') || '');
+  const match = m.match(/20\d{2}/); return match ? match[0] : '';
+}
+function getMonthLabel(row){return String(pick(row,'month') || pick(row,'year') || '').trim() || '—'}
+function filterRows(rows,{rop=state.rop,tl=state.tl,period=state.period}={}){
+  return (rows||[]).filter(r => {
+    const okRop = rop === '__all' || String(pick(r,'rop')||'').trim() === rop;
+    const okTl = tl === '__all' || String(pick(r,'tl')||'').trim() === tl;
+    const y = getYear(r); const okPeriod = !period || y === '' || y === String(period);
+    return okRop && okTl && okPeriod;
+  });
+}
+function sum(rows,key){return rows.reduce((a,r)=>a+(asNumber(pick(r,key))||0),0)}
+function avg(rows,key){const vals=rows.map(r=>asNumber(pick(r,key))).filter(isFinite); return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : NaN}
+function group(rows,labelKey,valueKey,agg='sum'){
+  const m = new Map();
+  rows.forEach(r=>{const k = String(pick(r,labelKey) || 'Без значения').trim(); const v = asNumber(pick(r,valueKey)); if(!m.has(k)) m.set(k,[]); if(isFinite(v)) m.get(k).push(v);});
+  return [...m.entries()].map(([label,vals])=>({label,value: vals.length ? (agg==='avg'? vals.reduce((a,b)=>a+b,0)/vals.length : vals.reduce((a,b)=>a+b,0)) : 0}));
+}
+function latestByMonth(rows){
+  const arr = [...rows];
+  return arr[arr.length-1] || {};
+}
+function clearCharts(){ state.charts.forEach(c=>c.destroy()); state.charts=[]; }
+function makeChart(id,type,labels,data,label){
+  const ctx = document.getElementById(id); if(!ctx) return;
+  const chart = new Chart(ctx,{type, data:{labels,datasets:[{label,data,borderColor:'#111827',backgroundColor:['#111827','#4b5563','#9ca3af','#d1d5db','#e5e7eb','#6b7280','#374151'],tension:.25,borderWidth:2}]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type!=='bar'}},scales:type==='doughnut'?{}:{y:{beginAtZero:true,grid:{color:'#eeeeee'}},x:{grid:{display:false}}}}});
+  state.charts.push(chart);
+}
+function card(name,value,note=''){return `<section class="card kpi"><div class="name">${name}</div><div class="value">${value}</div><div class="note">${note}</div></section>`}
+function chartCard(cls,title,id){return `<section class="card ${cls}"><h2>${title}</h2><div style="height:320px"><canvas id="${id}"></canvas></div></section>`}
+function tableCard(cls,title,rows,cols){
+  const body = rows.length ? rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c.key] ?? '—'}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${cols.length}" class="empty">Нет данных по выбранным фильтрам</td></tr>`;
+  return `<section class="card ${cls}"><h2>${title}</h2><div class="table-wrap"><table><thead><tr>${cols.map(c=>`<th>${c.name}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div></section>`;
+}
+function render(){
+  clearCharts();
+  if(state.page === 'history') renderHistory();
+  if(state.page === 'current') renderCurrent();
+  if(state.page === 'forecast') renderForecast();
+}
+function renderHistory(){
+  const hist = filterRows(state.raw['исторические данные'] || [], {period:state.period});
+  const turnover = filterRows(state.raw['текучесть кадров'] || [], {period:state.period});
+  const rows = hist.length ? hist : turnover;
+  const fired = sum(rows,'fired');
+  const hired = sum(rows,'hired');
+  const avgTurn = avg(rows,'turnover');
+  const cohorts = group(rows,'cohort','fired').sort((a,b)=>b.value-a.value).slice(0,8);
+  const months = group(rows,'month','turnover','avg');
+  app.innerHTML = `<div class="grid">
+    ${card('Уволено за период', num(fired), `Период: ${state.period}`)}
+    ${card('Принято за период', num(hired), 'По данным исторических вкладок')}
+    ${card('Средняя текучесть', pct(avgTurn), 'Среднее значение по строкам')}
+    ${card('Когорт в детализации', num(cohorts.length), 'По признаку «когорта/стаж»')}
+    ${chartCard('span8','Динамика текучести по месяцам','histTurnover')}
+    ${chartCard('span4','Уволенные по когортам','histCohorts')}
+    ${tableCard('span12','Детализация исторических данных', rows.slice(-30).reverse().map(r=>({month:getMonthLabel(r),rop:pick(r,'rop'),tl:pick(r,'tl'),cohort:pick(r,'cohort'),fired:num(asNumber(pick(r,'fired'))),turnover:pct(asNumber(pick(r,'turnover')))})),[
+      {key:'month',name:'Период'},{key:'rop',name:'РОП'},{key:'tl',name:'Тимлид'},{key:'cohort',name:'Когорта'},{key:'fired',name:'Уволено'},{key:'turnover',name:'Текучесть'}])}
+  </div>`;
+  makeChart('histTurnover','line',months.map(x=>x.label),months.map(x=>x.value),'Текучесть');
+  makeChart('histCohorts','doughnut',cohorts.map(x=>x.label),cohorts.map(x=>x.value),'Уволено');
+}
+function renderCurrent(){
+  const cur = filterRows(state.raw['текущая ситуация'] || [], {period:''});
+  const ropBreak = filterRows(state.raw['Разбивка по РОП численость'] || [], {period:''});
+  const tlLoad = filterRows(state.raw['Тимлиды нагрузка'] || [], {period:''});
+  const base = cur.length ? cur : ropBreak;
+  const staff = sum(base,'staff') || base.length;
+  const rops = group(base,'rop','staff').sort((a,b)=>b.value-a.value);
+  const tls = group(tlLoad.length ? tlLoad : base,'tl', tlLoad.length ? 'load':'staff').sort((a,b)=>b.value-a.value);
+  const cohorts = group(base,'cohort','staff').sort((a,b)=>b.value-a.value);
+  app.innerHTML = `<div class="grid">
+    ${card('Текущая численность', num(staff), state.rop==='__all'?'По отделу':`РОП: ${state.rop}`)}
+    ${card('РОПов в выборке', num(rops.length), 'С учетом фильтра')}
+    ${card('Тимлидов в выборке', num(tls.length), 'График ниже перестраивается по РОПу')}
+    ${card('Средняя нагрузка ТЛ', num(avg(tlLoad.length?tlLoad:base, tlLoad.length?'load':'staff')), 'Человек на тимлида')}
+    ${chartCard('span6','Численность по РОПам','currentRop')}
+    ${chartCard('span6','Нагрузка тимлидов','currentTl')}
+    ${chartCard('span4','Структура по когортам','currentCohorts')}
+    ${tableCard('span8','Операционная таблица по текущей ситуации', (tlLoad.length?tlLoad:base).map(r=>({rop:pick(r,'rop'),tl:pick(r,'tl'),staff:num(asNumber(pick(r,'staff'))),load:num(asNumber(pick(r,'load'))),limit:num(asNumber(pick(r,'limit'))),cohort:pick(r,'cohort')})),[
+      {key:'rop',name:'РОП'},{key:'tl',name:'Тимлид'},{key:'staff',name:'Численность'},{key:'load',name:'Нагрузка'},{key:'limit',name:'Лимит'},{key:'cohort',name:'Когорта'}])}
+  </div>`;
+  makeChart('currentRop','bar',rops.map(x=>x.label),rops.map(x=>x.value),'Численность');
+  makeChart('currentTl','bar',tls.map(x=>x.label),tls.map(x=>x.value),'Нагрузка');
+  makeChart('currentCohorts','doughnut',cohorts.map(x=>x.label),cohorts.map(x=>x.value),'Численность');
+}
+function renderForecast(){
+  const f = filterRows(state.raw['прогноз сводный'] || [], {period:'2026'});
+  const months = group(f,'month','forecastStaff');
+  const hired = group(f,'month','hired');
+  const fired = group(f,'month','fired');
+  const last = latestByMonth(f);
+  const staffLast = asNumber(pick(last,'forecastStaff')) || asNumber(pick(last,'staff'));
+  const avgSurv = avg(f,'survival');
+  app.innerHTML = `<div class="grid">
+    ${card('Прогноз численности на конец периода', num(staffLast), 'Берется последняя строка прогноза')}
+    ${card('Плановый набор', num(sum(f,'hired')), 'Сумма по 2026 году')}
+    ${card('Прогноз увольнений', num(sum(f,'fired')), 'Сумма по 2026 году')}
+    ${card('Средняя выживаемость', pct(avgSurv), 'Если показатель есть во вкладке')}
+    ${chartCard('span8','Прогноз численности по месяцам','forecastStaff')}
+    ${chartCard('span4','Набор и увольнения: суммарно','forecastHireFire')}
+    ${tableCard('span12','Прогноз сводный: контрольные значения', f.map(r=>({month:getMonthLabel(r),staff:num(asNumber(pick(r,'forecastStaff')) || asNumber(pick(r,'staff'))),hired:num(asNumber(pick(r,'hired'))),fired:num(asNumber(pick(r,'fired'))),survival:pct(asNumber(pick(r,'survival'))),turnover:pct(asNumber(pick(r,'turnover')))})),[
+      {key:'month',name:'Месяц'},{key:'staff',name:'Прогноз численности'},{key:'hired',name:'Набор'},{key:'fired',name:'Увольнения'},{key:'survival',name:'Выживаемость'},{key:'turnover',name:'Текучесть'}])}
+  </div>`;
+  makeChart('forecastStaff','line',months.map(x=>x.label),months.map(x=>x.value),'Численность');
+  makeChart('forecastHireFire','bar',['Набор','Увольнения'],[sum(f,'hired'),sum(f,'fired')],'Количество');
+}
+async function loadCsv(sheetId, sheetName){
+  const url = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetId)}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  const res = await fetch(url, {cache:'no-store'});
+  if(!res.ok) throw new Error(`Не удалось загрузить вкладку «${sheetName}»: ${res.status}`);
+  const text = await res.text();
+  const parsed = Papa.parse(text, {header:true, dynamicTyping:false, skipEmptyLines:true});
+  if(parsed.errors?.length) console.warn(sheetName, parsed.errors);
+  return parsed.data.filter(r => Object.values(r).some(v => String(v ?? '').trim() !== ''));
+}
+function fillFilters(){
+  const allRows = Object.values(state.raw).flat();
+  const rops = unique(allRows.map(r=>pick(r,'rop')));
+  const selectedRop = state.rop;
+  $('#ropFilter').innerHTML = `<option value="__all">Все РОПы</option>` + rops.map(x=>`<option ${x===selectedRop?'selected':''}>${x}</option>`).join('');
+  const tlsRows = state.rop==='__all' ? allRows : allRows.filter(r=>String(pick(r,'rop')||'').trim()===state.rop);
+  const tls = unique(tlsRows.map(r=>pick(r,'tl')));
+  if(!tls.includes(state.tl)) state.tl='__all';
+  $('#tlFilter').innerHTML = `<option value="__all">Все тимлиды</option>` + tls.map(x=>`<option ${x===state.tl?'selected':''}>${x}</option>`).join('');
+}
+async function loadAll(){
+  const sheetId = sheetIdInput.value.trim();
+  if(!sheetId){
+    $('#errorBox').style.display='block'; $('#errorBox').textContent='Укажите ID Google Sheets. Его можно передать параметром ?sheetId=... или вставить в поле сверху.';
+    app.innerHTML = `<section class="card"><h2>Как подключить файл</h2><p class="hint">Откройте Google Sheets → File / Share → Publish to web. После публикации вставьте ID таблицы в поле сверху. Для закрытого корпоративного файла нужен прокси на Apps Script или серверная авторизация.</p></section>`;
+    return;
+  }
+  localStorage.setItem('salesDashboardSheetId', sheetId);
+  $('#errorBox').style.display='none';
+  $('#status').textContent='Загрузка данных...';
+  const result = {};
+  const errors = [];
+  await Promise.all(CONFIG.requiredSheets.map(async s=>{
+    try{ result[s] = await loadCsv(sheetId, s); }
+    catch(e){ result[s] = []; errors.push(e.message); }
+  }));
+  state.raw = result;
+  state.lastLoad = new Date();
+  fillFilters();
+  $('#status').innerHTML = `Обновлено: ${state.lastLoad.toLocaleString('ru-RU')}<br>Загружено вкладок: ${Object.values(result).filter(x=>x.length).length}/${CONFIG.requiredSheets.length}`;
+  if(errors.length){ $('#errorBox').style.display='block'; $('#errorBox').innerHTML = errors.join('<br>'); }
+  render();
+}
+document.querySelectorAll('.tab[data-page]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tab[data-page]').forEach(x=>x.classList.remove('active')); b.classList.add('active'); state.page=b.dataset.page; render();}));
+$('#ropFilter').addEventListener('change',e=>{state.rop=e.target.value; fillFilters(); render();});
+$('#tlFilter').addEventListener('change',e=>{state.tl=e.target.value; render();});
+$('#periodFilter').addEventListener('change',e=>{state.period=e.target.value; render();});
+$('#reload').addEventListener('click',loadAll);
+sheetIdInput.addEventListener('change',loadAll);
+loadAll();
+setInterval(loadAll, CONFIG.refreshMs);
+</script>
+</body>
+</html>
